@@ -1,0 +1,19 @@
+# 가상환경 / 캐시
+.venv/
+__pycache__/
+*.pyc
+
+# OS / 에디터
+.DS_Store
+.idea/
+.vscode/
+
+# 민감 데이터: 영상과 실제 씬 데이터는 절대 커밋하지 않는다
+*.mov
+*.mp4
+*.m4v
+*.json
+# 공유용 샘플 데이터만 예외
+!test_timeline_data.json
+
+.env
