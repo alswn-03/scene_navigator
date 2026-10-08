@@ -5,7 +5,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import theme
+from theme import c
 
 VIDEO_KINDS = {
     ".mov": "QuickTime Movie",
@@ -69,9 +71,9 @@ class IconBadge(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         if self.kind == "video":
-            background, stroke = QColor("#e1efe8"), QColor("#36684f")
+            background, stroke = c("video_bg"), c("video_fg")
         else:
-            background, stroke = QColor("#f3ead8"), QColor("#7a5c2e")
+            background, stroke = c("doc_bg"), c("doc_fg")
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(background)
@@ -215,48 +217,59 @@ class FilesDialog(QDialog):
         self.video_card.clicked.connect(self.video_requested)
         self.scene_card.clicked.connect(self.scenes_requested)
 
+        self.apply_theme()
+
+        self.refresh(None, None, 0)
+
+    def apply_theme(self):
         self.setStyleSheet(
             """
-            QDialog { background: #fafaf8; }
+            QDialog { background: %(bg)s; }
 
             QLabel#eyebrow {
-                color: #7f8a85; font-size: 11px; font-weight: 700;
+                color: %(text_muted)s; font-size: 11px; font-weight: 700;
                 letter-spacing: 2px;
             }
             QLabel#dialogTitle {
-                color: #15201c; font-size: 26px; font-weight: 700;
+                color: %(text)s; font-size: 26px; font-weight: 700;
             }
-            QLabel#description { color: #44504a; font-size: 13px; }
+            QLabel#description { color: %(text_desc)s; font-size: 13px; }
 
             QLabel#sectionName {
-                color: #7f8a85; font-size: 11px; font-weight: 700;
+                color: %(text_muted)s; font-size: 11px; font-weight: 700;
                 letter-spacing: 2px;
             }
-            QLabel#statusOn { color: #36684f; font-size: 12px; font-weight: 600; }
-            QLabel#statusOff { color: #9aa49f; font-size: 12px; }
+            QLabel#statusOn { color: %(accent)s; font-size: 12px; font-weight: 600; }
+            QLabel#statusOff { color: %(text_off)s; font-size: 12px; }
 
             QPushButton#card {
-                background: #ffffff; border: 1px solid #dfe5e1;
+                background: %(surface)s; border: 1px solid %(border)s;
                 border-radius: 14px; text-align: left;
             }
-            QPushButton#card:hover { border-color: #36684f; background: #fcfdfc; }
+            QPushButton#card:hover { border-color: %(accent)s; background: %(surface_hover)s; }
 
-            QLabel#cardTitle { color: #15201c; font-size: 14px; font-weight: 600; }
-            QLabel#cardSub { color: #7f8a85; font-size: 12px; }
-            QLabel#chevron { color: #44504a; font-size: 22px; }
+            QLabel#cardTitle { color: %(text)s; font-size: 14px; font-weight: 600; }
+            QLabel#cardSub { color: %(text_muted)s; font-size: 12px; }
+            QLabel#chevron { color: %(text_desc)s; font-size: 22px; }
 
-            QFrame#divider { background: #e3e8e5; border: none; }
+            QFrame#divider { background: %(divider)s; border: none; }
 
             QPushButton#done {
-                background: #36684f; color: #ffffff; border: none;
+                background: %(accent)s; color: %(on_accent)s; border: none;
                 border-radius: 10px; padding: 8px 26px;
                 font-size: 13px; font-weight: 600;
             }
-            QPushButton#done:hover { background: #2d5942; }
-            """
+            QPushButton#done:hover { background: %(accent_hover)s; }
+            """ % theme.hexes()
         )
 
-        self.refresh(None, None, 0)
+        # 상태 라벨 색은 objectName 기준이므로 다시 polish
+        for label in (self.video_status, self.scene_status):
+            label.style().unpolish(label)
+            label.style().polish(label)
+
+        for badge in self.findChildren(IconBadge):
+            badge.update()
 
     def _section(self, name: str, status: QLabel) -> QHBoxLayout:
         label = QLabel(name)

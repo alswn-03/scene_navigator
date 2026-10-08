@@ -12,15 +12,7 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QToolTip, QWidget
 
 from scene_data import Scene
-
-GREEN = QColor("#36684f")
-TRACK = QColor("#dfe5e1")
-ORANGE = QColor("#e59d38")
-LABEL = QColor("#87928d")
-TICK = QColor("#c9d1cd")
-MARKER_BORDER = QColor("#cdd6d1")
-OVERVIEW_TRACK = QColor("#e6ebe8")
-OVERVIEW_HANDLE = QColor("#a3ada8")
+from theme import c, is_dark
 
 MIN_ZOOM = 1.0
 MAX_ZOOM = 10.0
@@ -231,14 +223,14 @@ class TimelineWidget(QWidget):
             x = self._time_to_x(t)
 
             if x is not None:
-                painter.setPen(LABEL)
+                painter.setPen(c("label"))
                 painter.drawText(
                     QRectF(x - 32, LABEL_Y - 8, 64, 16),
                     Qt.AlignmentFlag.AlignCenter,
                     format_clock(t, with_hours),
                 )
 
-                painter.setPen(QPen(TICK, 1))
+                painter.setPen(QPen(c("tick"), 1))
                 painter.drawLine(
                     QPointF(x, LABEL_Y + 11),
                     QPointF(x, LABEL_Y + 16),
@@ -250,7 +242,7 @@ class TimelineWidget(QWidget):
         right = MARGIN + self._track_width()
 
         painter.setPen(
-            QPen(TRACK, BAR_WIDTH, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            QPen(c("track"), BAR_WIDTH, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         )
         painter.drawLine(QPointF(MARGIN, BAR_Y), QPointF(right, BAR_Y))
 
@@ -265,7 +257,7 @@ class TimelineWidget(QWidget):
             return
 
         painter.setPen(
-            QPen(GREEN, BAR_WIDTH, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            QPen(c("accent"), BAR_WIDTH, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         )
         painter.drawLine(
             QPointF(MARGIN, BAR_Y),
@@ -283,12 +275,12 @@ class TimelineWidget(QWidget):
 
             # 그림자
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(0, 0, 0, 28))
+            painter.setBrush(QColor(0, 0, 0, 80 if is_dark() else 28))
             painter.drawEllipse(QPointF(x, BAR_Y + 1.5), radius + 0.5, radius + 0.5)
 
-            painter.setBrush(QColor("#ffffff"))
+            painter.setBrush(c("marker_fill"))
             painter.setPen(
-                QPen(GREEN if index == self._hover else MARKER_BORDER, 1)
+                QPen(c("accent") if index == self._hover else c("marker_border"), 1)
             )
             painter.drawEllipse(QPointF(x, BAR_Y), radius, radius)
 
@@ -299,7 +291,7 @@ class TimelineWidget(QWidget):
             return
 
         painter.setPen(
-            QPen(ORANGE, 2.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            QPen(c("orange"), 2.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         )
         painter.drawLine(QPointF(x, BAR_Y - 17), QPointF(x, BAR_Y + 17))
 
@@ -321,17 +313,17 @@ class TimelineWidget(QWidget):
 
         # 전체 영상 범위 (항상 표시)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(OVERVIEW_TRACK)
+        painter.setBrush(c("overview_track"))
         painter.drawRoundedRect(
-            QRectF(MARGIN, OVERVIEW_Y - 2, width, 4), 2, 2
+            QRectF(MARGIN, OVERVIEW_Y - 1.5, width, 3), 1.5, 1.5
         )
 
         # 현재 보고 있는 범위
         left, handle_width = self._overview_handle()
 
-        painter.setBrush(OVERVIEW_HANDLE)
+        painter.setBrush(c("overview_handle"))
         painter.drawRoundedRect(
-            QRectF(left, OVERVIEW_Y - 3.5, handle_width, 7), 3.5, 3.5
+            QRectF(left, OVERVIEW_Y - 2.5, handle_width, 5), 2.5, 2.5
         )
 
         # 전체 대비 재생 위치
@@ -339,9 +331,9 @@ class TimelineWidget(QWidget):
             x = MARGIN + width * min(1.0, self.current_time / self.duration)
 
             painter.setPen(
-                QPen(ORANGE, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+                QPen(c("orange"), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
             )
-            painter.drawLine(QPointF(x, OVERVIEW_Y - 7), QPointF(x, OVERVIEW_Y + 7))
+            painter.drawLine(QPointF(x, OVERVIEW_Y - 5), QPointF(x, OVERVIEW_Y + 5))
 
     # ------------------------------------------------------------
     # 입력

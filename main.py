@@ -27,7 +27,9 @@ from PySide6.QtWidgets import (
 from files_dialog import FilesDialog
 from quicktime_controller import QuickTimeController, QuickTimeWorker
 from scene_data import load_scenes
-from timeline_widget import GREEN, MAX_ZOOM, MIN_ZOOM, TimelineWidget
+import theme
+from theme import c
+from timeline_widget import MAX_ZOOM, MIN_ZOOM, TimelineWidget
 
 # 타임라인에서 이동한 뒤 QuickTime을 자동 재생할지 여부
 PLAY_AFTER_SEEK = True
@@ -78,19 +80,19 @@ class TransportButton(QPushButton):
         cx = cy = d / 2
 
         if self.kind in ("play", "pause"):
-            color = QColor("#2d5942") if self.underMouse() else GREEN
+            color = c("accent_hover") if self.underMouse() else c("accent")
 
             if self.isDown():
-                color = QColor("#244a37")
+                color = c("accent_press")
 
             # 부드러운 그림자
-            painter.setBrush(QColor(54, 104, 79, 40))
+            painter.setBrush(c("accent", 40))
             painter.drawEllipse(QPointF(cx, cy + 3), d / 2 - 2, d / 2 - 2)
 
             painter.setBrush(color)
             painter.drawEllipse(QPointF(cx, cy), d / 2 - 2, d / 2 - 2)
 
-            painter.setBrush(QColor("#ffffff"))
+            painter.setBrush(c("on_accent"))
 
             if self.kind == "play":
                 w, h = d * 0.26, d * 0.32
@@ -106,7 +108,7 @@ class TransportButton(QPushButton):
 
             return
 
-        painter.setBrush(QColor("#15201c") if self.underMouse() else QColor("#4a5750"))
+        painter.setBrush(c("transport_hover") if self.underMouse() else c("transport"))
 
         w, h = d * 0.2, d * 0.34
         forward = self.kind == "next"
@@ -134,6 +136,8 @@ class SceneNavigator(QMainWindow):
         self._speed = 1.0  # 재생 배속 (일시정지 중에도 기억)
         self._issued = 0  # UI가 보낸 명령 수 (오래된 폴링 결과 무시용)
         self._last_shown = None
+
+        self.theme_overridden = False
 
         self.setWindowTitle("Scene Navigator")
         self.resize(720, 240)
@@ -180,7 +184,6 @@ class SceneNavigator(QMainWindow):
         files_button.clicked.connect(self.open_files)
 
         # 오류 안내용 한 줄 (평소에는 숨김)
-        self.info_label.setStyleSheet("color: #c0563f;")
         self.info_label.hide()
 
         layout.addWidget(self.info_label)
@@ -216,11 +219,6 @@ class SceneNavigator(QMainWindow):
         layout.addWidget(self.timeline, 1)
 
         # 줌
-        hint_mark = hint_line()
-
-        hint = QLabel("Scroll horizontally to move")
-        hint.setObjectName("hint")
-
         minus_button = self._zoom_button("−")
         plus_button = self._zoom_button("+")
 
@@ -244,8 +242,6 @@ class SceneNavigator(QMainWindow):
 
         zoom_row = QHBoxLayout()
         zoom_row.setSpacing(8)
-        zoom_row.addWidget(hint_mark)
-        zoom_row.addWidget(hint)
         zoom_row.addStretch()
         zoom_row.addWidget(minus_button)
         zoom_row.addWidget(self.zoom_slider)
@@ -292,7 +288,7 @@ class SceneNavigator(QMainWindow):
         bottom = QHBoxLayout()
         self.speed_button = QPushButton("1×")
         self.speed_button.setObjectName("zoomButton")
-        self.speed_button.setFixedSize(48, 24)
+        self.speed_button.setFixedSize(40, 20)
         self.speed_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.speed_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.speed_button.setToolTip("재생 속도")
@@ -306,8 +302,17 @@ class SceneNavigator(QMainWindow):
 
         self.speed_button.setMenu(speed_menu)
 
+        self.theme_button = QPushButton()
+        self.theme_button.setObjectName("zoomButton")
+        self.theme_button.setFixedSize(40, 20)
+        self.theme_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.theme_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.theme_button.clicked.connect(self.toggle_theme)
+
         left_box = QHBoxLayout()
+        left_box.setSpacing(6)
         left_box.addWidget(self.speed_button)
+        left_box.addWidget(self.theme_button)
         left_box.addStretch()
         bottom.addLayout(left_box, 1)
         bottom.addLayout(transport, 0)
@@ -315,59 +320,84 @@ class SceneNavigator(QMainWindow):
 
         layout.addLayout(bottom)
 
-        root.setStyleSheet(
-            """
-            QWidget#root { background-color: #fafaf8; }
+        self.apply_theme()
 
-            QLabel#info { color: #7f8a85; font-size: 11px; }
-            QLabel#time { color: #15201c; font-size: 26px; font-weight: 700; }
+        self._refresh_status()
+        self.update_info()
+
+    def apply_theme(self):
+        """현재 팔레트를 스타일시트와 직접 그리는 위젯에 반영."""
+
+        self.centralWidget().setStyleSheet(
+            """
+            QWidget#root { background-color: %(bg)s; }
+
+            QLabel#info { color: %(text_muted)s; font-size: 11px; }
+            QLabel#time { color: %(text)s; font-size: 26px; font-weight: 700; }
             QLabel#duration {
-                color: #8a9590; font-size: 14px; font-weight: 500;
+                color: %(text_dim)s; font-size: 14px; font-weight: 500;
                 padding-bottom: 3px;
             }
-            QLabel#hint { color: #8a9590; font-size: 11px; }
-            QLabel#zoomLabel { color: #34413b; font-size: 12px; font-weight: 700; }
-            QLabel#status { color: #7f8a85; font-size: 11px; }
+            QLabel#zoomLabel { color: %(text_strong)s; font-size: 12px; font-weight: 700; }
+            QLabel#status { color: %(text_muted)s; font-size: 11px; }
             QLabel#badge {
                 background: #6f8fd0; color: #ffffff; border-radius: 5px;
                 font-size: 10px; font-weight: 700;
             }
 
             QPushButton#files {
-                background: #ffffff; color: #34413b;
-                border: 1px solid #dfe5e1; border-radius: 9px;
+                background: %(surface)s; color: %(text_strong)s;
+                border: 1px solid %(border)s; border-radius: 9px;
                 padding: 5px 14px; font-size: 12px; font-weight: 600;
             }
-            QPushButton#files:hover { background: #f3f6f4; }
+            QPushButton#files:hover { background: %(hover_bg)s; }
 
             QPushButton#zoomButton {
-                background: #ffffff; color: #34413b;
-                border: 1px solid #dfe5e1; border-radius: 8px;
-                font-size: 15px;
+                background: %(surface)s; color: %(text_strong)s;
+                border: 1px solid %(border)s; border-radius: 8px;
+                font-size: 12px; padding: 0;
             }
-            QPushButton#zoomButton:hover { background: #f3f6f4; }
+            QPushButton#zoomButton:hover { background: %(hover_bg)s; }
             QPushButton#zoomButton::menu-indicator { image: none; }
 
             QSlider::groove:horizontal {
-                height: 3px; background: #d5dcd8; border-radius: 1px;
+                height: 3px; background: %(track)s; border-radius: 1px;
             }
             QSlider::sub-page:horizontal {
-                background: #36684f; border-radius: 1px;
+                background: %(accent)s; border-radius: 1px;
             }
             QSlider::handle:horizontal {
-                background: #36684f; width: 14px; height: 14px;
+                background: %(accent)s; width: 14px; height: 14px;
                 margin: -6px 0; border-radius: 7px;
             }
-            """
+            """ % theme.hexes()
         )
+        self.info_label.setStyleSheet(f"color: {theme.hexes()['error']};")
+
+        # 다크일 때는 해(라이트로 전환), 라이트일 때는 달(다크로 전환)
+        self.theme_button.setText("☀" if theme.is_dark() else "☾")
+        self.theme_button.setToolTip("라이트 모드" if theme.is_dark() else "다크 모드")
+
+        self.timeline.update()
+
+        for button in (self.prev_button, self.play_button, self.next_button):
+            button.update()
 
         self._refresh_status()
-        self.update_info()
+
+        if hasattr(self, "files_dialog"):
+            self.files_dialog.apply_theme()
+
+    def toggle_theme(self):
+        # 직접 고른 모드는 이후 시스템 설정 변경보다 우선한다
+        self.theme_overridden = True
+        theme.set_dark(not theme.is_dark())
+        self.apply_theme()
 
     def _zoom_button(self, text: str) -> QPushButton:
         button = QPushButton(text)
         button.setObjectName("zoomButton")
-        button.setFixedSize(30, 26)
+        button.setFixedSize(24, 20)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
@@ -519,7 +549,7 @@ class SceneNavigator(QMainWindow):
 
         self.status_label.setText(text)
         self.status_badge.setStyleSheet(
-            "" if connected and self._status == "ok" else "background: #b9c2bd;"
+            "" if connected and self._status == "ok" else f"background: {theme.hexes()['badge_off']};"
         )
 
     # ------------------------------------------------------------
@@ -614,23 +644,23 @@ class SceneNavigator(QMainWindow):
         super().closeEvent(event)
 
 
-def hint_line() -> QWidget:
-    """힌트 문구 앞의 짧은 회색 선."""
-
-    line = QWidget()
-    line.setFixedSize(18, 3)
-    line.setStyleSheet("background: #d5dcd8; border-radius: 1px;")
-
-    return line
-
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # macOS 다크모드와 관계없이 밝은 UI 유지
-    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    # 시스템 라이트/다크 설정을 따라간다 (바뀌면 즉시 반영)
+    hints = app.styleHints()
+
+    def sync_theme(*_):
+        if window.theme_overridden:
+            return
+
+        theme.set_dark(hints.colorScheme() == Qt.ColorScheme.Dark)
+        window.apply_theme()
+
+    theme.set_dark(hints.colorScheme() == Qt.ColorScheme.Dark)
 
     window = SceneNavigator()
+    hints.colorSchemeChanged.connect(sync_theme)
     window.show()
 
     sys.exit(app.exec())
